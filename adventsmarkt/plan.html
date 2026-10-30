@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#b3261e">
+<title>Adventsmarkt · Übersichtsplan</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎄</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="garland"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="../">‹ Alle Tools</a>
+    <h1>🎄 <span id="titel">Adventsmarkt</span></h1>
+    <div class="sub" id="untertitel">Übersichtsplan</div>
+    <nav class="tabs">
+      <a href="./">Eintragen</a>
+      <a href="plan.html" aria-current="page">Übersichtsplan</a>
+    </nav>
+  </header>
+
+  <div id="loading" class="loading"><span class="spinner"></span> Lade aktuelle Belegung …</div>
+  <div id="msg" class="notice err hidden" role="alert"></div>
+
+  <div id="content" class="hidden">
+    <div class="stats" id="stats"></div>
+    <div class="row noprint" style="margin-top:14px;justify-content:space-between">
+      <span class="muted small" id="stand"></span>
+      <span class="row">
+        <button class="btn small" id="reloadBtn">↻ Aktualisieren</button>
+        <button class="btn small primary" id="pdfBtn">⤓ Als PDF herunterladen</button>
+      </span>
+    </div>
+    <div id="adminBar" class="notice info hidden"></div>
+    <section class="card" id="secAufbau"></section>
+    <section class="card" id="secS1"></section>
+    <section class="card" id="secS2"></section>
+    <section class="card" id="secAbbau"></section>
+  </div>
+
+  <section class="card noprint hidden" id="adminCard">
+    <h2>Verwaltung</h2>
+    <div class="muted small">Nur für das Orga-Team: zeigt die persönlichen Codes und erlaubt das Ändern und Löschen aller Einträge.</div>
+    <form id="adminForm" class="row" style="margin-top:12px;flex-wrap:nowrap">
+      <input type="text" id="adminPin" placeholder="Admin-PIN" autocomplete="off" inputmode="text">
+      <button class="btn" type="submit" id="adminBtn">Anmelden</button>
+    </form>
+    <div id="adminErr" class="notice err hidden"></div>
+  </section>
+
+  <div class="foot">
+    <button class="linkbtn" id="adminToggle">Verwaltung</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = AM.$, esc = AM.esc;
+  var S = null, admin = null; // admin: Liste mit Codes, wenn angemeldet
+
+  function showMsg(t) { $('#msg').textContent = t; $('#msg').classList.toggle('hidden', !t); }
+
+  function load(btn) {
+    if (!AM.apiUrl()) { $('#loading').classList.add('hidden'); showMsg('Einrichtung fehlt: In adventsmarkt/config.js ist noch keine Web-App-URL eingetragen.'); return; }
+    if (btn) AM.busy(btn, true, 'Lade …');
+    var pin = AM.getAdminPin();
+    var req = pin ? AM.api('admin', { pin: pin }) : AM.api('state');
+    return req.then(function (r) {
+      if (btn) AM.busy(btn, false);
+      if (!r.ok && pin) { AM.setAdminPin(''); admin = null; return load(btn); }
+      if (!r.ok) throw new Error(r.error);
+      S = r.state; admin = pin ? r.entries : null;
+      $('#loading').classList.add('hidden'); showMsg('');
+      render();
+    }).catch(function (e) {
+      if (btn) AM.busy(btn, false);
+      $('#loading').classList.add('hidden'); showMsg(e.message);
+    });
+  }
+
+  // ---------- Daten für Anzeige und PDF ----------
+  function model() {
+    var c = S.config, byKey = { s1: {}, s2: {} }, auf = [], ab = [];
+    var full = {};
+    if (admin) admin.forEach(function (x) { full[x.id] = x; });
+    S.entries.forEach(function (x) {
+      var p = { id: x.id, name: x.name, klasse: x.klasse, code: full[x.id] ? full[x.id].code : '' };
+      ['s1', 's2'].forEach(function (sh) { if (x[sh]) (byKey[sh][x[sh]] = byKey[sh][x[sh]] || []).push(p); });
+      if (x.aufbau) auf.push(p);
+      if (x.abbau) ab.push(p);
+    });
+    function shift(sh) {
+      var rows = [];
+      for (var b = 1; b <= c.buden; b++) {
+        var people = byKey[sh]['Bude ' + b] || [];
+        var cells = [];
+        for (var i = 0; i < c.proBude; i++) cells.push(people[i] || null);
+        var spNr = Math.ceil(b / 2);
+        rows.push({ bude: b, people: cells, springerNr: spNr, springer: (byKey[sh]['Springer ' + spNr] || [])[0] || null, firstOfPair: b % 2 === 1 });
+      }
+      return rows;
+    }
+    function fill(list, n) { var out = list.slice(0, n); while (out.length < n) out.push(null); return out; }
+    return { c: c, s1: shift('s1'), s2: shift('s2'), aufbau: fill(auf, Math.max(c.aufbau, auf.length)), abbau: fill(ab, Math.max(c.abbau, ab.length)) };
+  }
+
+  function counts() {
+    var c = S.config, o = AM.occupancy(S.entries);
+    return {
+      aufbau: [o.aufbau, c.aufbau],
+      s1: [o.s1.bude + o.s1.springer, c.buden * c.proBude + c.springer],
+      s2: [o.s2.bude + o.s2.springer, c.buden * c.proBude + c.springer],
+      abbau: [o.abbau, c.abbau]
+    };
+  }
+
+  // ---------- Rendern ----------
+  function person(p) {
+    if (!p) return '<span class="free">frei</span>';
+    var html = '<span class="p">' + esc(p.name) + ' <span class="kl">(' + esc(p.klasse) + ')</span>';
+    if (admin) {
+      html += '<span class="admin-tools"><button data-edit="' + esc(p.id) + '" title="Bearbeiten">✎</button><button data-del="' + esc(p.id) + '" title="Löschen">🗑</button></span>' +
+        '<span class="admin-meta">Code ' + esc(AM.fmtCode(p.code)) + '</span>';
+    }
+    return html + '</span>';
+  }
+
+  function render() {
+    var m = model(), c = m.c, z = c.zeiten, k = counts();
+    $('#titel').textContent = c.titel;
+    $('#untertitel').textContent = c.datum + ' · Übersichtsplan';
+    document.title = c.titel + ' · Übersichtsplan';
+    $('#stand').textContent = 'Stand: ' + S.stand;
+
+    function stat(label, v) {
+      var pct = v[1] ? Math.round(100 * v[0] / v[1]) : 0;
+      return '<div class="stat"><div class="k">' + label + '</div><div class="v">' + v[0] + ' / ' + v[1] + '</div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }
+    $('#stats').innerHTML = stat('Aufbau', k.aufbau) + stat('Schicht 1', k.s1) + stat('Schicht 2', k.s2) + stat('Abbau', k.abbau);
+
+    function list(title, time, arr) {
+      return '<h2>' + title + ' <span class="muted" style="font-weight:500;font-size:15px">· ' + esc(time) + '</span></h2>' +
+        '<ol class="list">' + arr.map(function (p) { return '<li>' + person(p) + '</li>'; }).join('') + '</ol>';
+    }
+    function shift(nr, time, rows) {
+      var html = '<h2>Schicht ' + nr + ' <span class="muted" style="font-weight:500;font-size:15px">· ' + esc(time) + '</span></h2>' +
+        '<table class="plan"><thead><tr><th>Bude</th><th>Verkauf</th><th>Springer:in</th></tr></thead><tbody>';
+      rows.forEach(function (r) {
+        html += '<tr><td class="unit">Bude ' + r.bude + '</td><td>' + r.people.map(person).join('') + '</td>';
+        if (r.firstOfPair) html += '<td class="sp" rowspan="2">' + person(r.springer) + '<span class="admin-meta">für Bude ' + r.bude + ' + ' + (r.bude + 1) + '</span></td>';
+        html += '</tr>';
+      });
+      return html + '</tbody></table>';
+    }
+    $('#secAufbau').innerHTML = list('Aufbau', z.aufbau, m.aufbau);
+    $('#secS1').innerHTML = shift(1, z.s1, m.s1);
+    $('#secS2').innerHTML = shift(2, z.s2, m.s2);
+    $('#secAbbau').innerHTML = list('Abbau', z.abbau, m.abbau);
+
+    var ab = $('#adminBar');
+    if (admin) {
+      ab.innerHTML = 'Verwaltung aktiv: Die persönlichen Codes werden angezeigt. <button class="linkbtn" id="logout">Abmelden</button>';
+      ab.classList.remove('hidden');
+      $('#logout').onclick = function () { AM.setAdminPin(''); admin = null; render(); };
+    } else ab.classList.add('hidden');
+    $('#content').classList.remove('hidden');
+  }
+
+  // ---------- Verwaltung ----------
+  $('#adminToggle').addEventListener('click', function () {
+    $('#adminCard').classList.toggle('hidden');
+    if (!$('#adminCard').classList.contains('hidden')) $('#adminPin').focus();
+  });
+  $('#adminForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var pin = $('#adminPin').value.trim(), btn = $('#adminBtn');
+    AM.busy(btn, true, '…');
+    AM.api('admin', { pin: pin }).then(function (r) {
+      AM.busy(btn, false);
+      if (!r.ok) { $('#adminErr').textContent = r.error; $('#adminErr').classList.remove('hidden'); return; }
+      AM.setAdminPin(pin); S = r.state; admin = r.entries;
+      $('#adminErr').classList.add('hidden'); $('#adminCard').classList.add('hidden'); $('#adminPin').value = '';
+      render();
+    }).catch(function (e) { AM.busy(btn, false); $('#adminErr').textContent = e.message; $('#adminErr').classList.remove('hidden'); });
+  });
+  $('#content').addEventListener('click', function (ev) {
+    var t = ev.target.closest('button[data-edit],button[data-del]'); if (!t || !admin) return;
+    if (t.dataset.edit) { location.href = './?admin=' + encodeURIComponent(t.dataset.edit); return; }
+    var x = S.entries.filter(function (e) { return e.id === t.dataset.del; })[0];
+    if (!x || !confirm('Eintrag von ' + x.name + ' wirklich löschen?')) return;
+    AM.api('delete', { pin: AM.getAdminPin(), id: x.id }).then(function (r) {
+      if (!r.ok) { showMsg(r.error); return; }
+      load();
+    }).catch(function (e) { showMsg(e.message); });
+  });
+
+  $('#reloadBtn').addEventListener('click', function () { load(this); });
+
+  // ---------- PDF ----------
+  function loadScript(src) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('PDF-Bibliothek konnte nicht geladen werden.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function ensurePdfLib() {
+    if (window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable) return Promise.resolve();
+    return loadScript('../lib/jspdf-2.5.1.umd.min.js').then(function () { return loadScript('../lib/jspdf-autotable-3.8.2.min.js'); });
+  }
+
+  $('#pdfBtn').addEventListener('click', function () {
+    var btn = this; AM.busy(btn, true, 'Erstelle PDF …');
+    ensurePdfLib().then(function () {
+      makePdf();
+      AM.busy(btn, false);
+    }).catch(function (e) { AM.busy(btn, false); showMsg(e.message); });
+  });
+
+  function makePdf() {
+    var m = model(), c = m.c, z = c.zeiten;
+    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    var W = doc.internal.pageSize.getWidth(), M = 12;
+    var red = [179, 38, 30], grey = [110, 110, 110];
+    function name(p, withSlot) {
+      if (!p) return '';
+      var s = p.name + ' (' + p.klasse + ')';
+      return s;
+    }
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(17); doc.setTextColor(0);
+    doc.text(c.titel + ': Helferplan', M, 16);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor.apply(doc, grey);
+    doc.text(c.datum + '   ·   Stand: ' + S.stand, M, 22);
+    doc.setDrawColor.apply(doc, red); doc.setLineWidth(0.8); doc.line(M, 25, W - M, 25);
+
+    var base = {
+      theme: 'grid', margin: { left: M, right: M },
+      styles: { font: 'helvetica', fontSize: 9.5, cellPadding: 1.8, lineColor: [200, 200, 200], lineWidth: 0.2, textColor: 20, valign: 'middle' },
+      headStyles: { fillColor: [238, 232, 224], textColor: 20, fontStyle: 'bold' },
+      didParseCell: function (d) { if (d.section === 'body' && d.cell.raw === '') { d.cell.text = ['frei']; d.cell.styles.textColor = [170, 170, 170]; d.cell.styles.fontStyle = 'italic'; } }
+    };
+    var y = 31;
+    function heading(t, time) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(0); doc.text(t, M, y);
+      var w = doc.getTextWidth(t);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc, grey); doc.text('  ·  ' + time, M + w, y);
+      y += 2;
+    }
+    function shift(nr, time, rows) {
+      heading('Schicht ' + nr, time);
+      var body = rows.map(function (r) {
+        var row = ['Bude ' + r.bude].concat(r.people.map(function (p) { return name(p); }));
+        if (r.firstOfPair) row.push({ content: name(r.springer), rowSpan: 2, styles: { fillColor: [250, 247, 242] } });
+        return row;
+      });
+      var head = ['Bude'].concat(r0(c.proBude)).concat(['Springer:in']);
+      var cs = { 0: { cellWidth: 18, fontStyle: 'bold' } }, vw = (W - 2 * M - 18 - 50) / c.proBude;
+      for (var k = 1; k <= c.proBude; k++) cs[k] = { cellWidth: vw };
+      cs[c.proBude + 1] = { cellWidth: 50 };
+      doc.autoTable(Object.assign({}, base, { startY: y, head: [head], body: body, columnStyles: cs }));
+      y = doc.lastAutoTable.finalY + 8;
+    }
+    function r0(n) { var a = []; for (var i = 1; i <= n; i++) a.push('Verkauf ' + i); return a; }
+    shift(1, z.s1, m.s1);
+    shift(2, z.s2, m.s2);
+
+    // Aufbau und Abbau nebeneinander
+    var half = (W - 2 * M - 6) / 2, top = y;
+    heading('Aufbau', z.aufbau);
+    doc.autoTable(Object.assign({}, base, { startY: y, margin: { left: M, right: W - M - half }, head: [['Nr.', 'Name']],
+      body: m.aufbau.map(function (p, i) { return [String(i + 1), name(p)]; }), columnStyles: { 0: { cellWidth: 10 } } }));
+    var endL = doc.lastAutoTable.finalY;
+    y = top;
+    var x2 = M + half + 6;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12.5); doc.setTextColor(0); doc.text('Abbau', x2, y);
+    var w2 = doc.getTextWidth('Abbau');
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc, grey); doc.text('  ·  ' + z.abbau, x2 + w2, y);
+    doc.autoTable(Object.assign({}, base, { startY: y + 2, margin: { left: x2, right: M }, head: [['Nr.', 'Name']],
+      body: m.abbau.map(function (p, i) { return [String(i + 1), name(p)]; }), columnStyles: { 0: { cellWidth: 10 } } }));
+
+    var pages = doc.internal.getNumberOfPages();
+    for (var i = 1; i <= pages; i++) {
+      doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150);
+      doc.text('Elternbeirat · ' + c.titel + (pages > 1 ? '   ·   Seite ' + i + ' von ' + pages : ''), M, doc.internal.pageSize.getHeight() - 7);
+    }
+    var fn = c.titel.replace(/[^A-Za-z0-9ÄÖÜäöüß]+/g, '-') + '_Helferplan.pdf';
+    doc.save(fn);
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

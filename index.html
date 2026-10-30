@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#b3261e">
+<title>Elternbeirat · Tools</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏫</text></svg>">
+<style>
+  :root{
+    --bg:#f6f2ec; --bg2:#efe8de; --card:#ffffff; --card2:#fbf8f4;
+    --line:#e3dacd; --ink:#1f2328; --mut:#5d646e; --mut2:#8a919b;
+    --red:#b3261e; --green:#1e6b47; --gold:#b7832a;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#111418; --bg2:#171b21; --card:#1b2027; --card2:#20262e;
+      --line:#2d343e; --ink:#eef1f5; --mut:#a6afbb; --mut2:#7c8592;
+      --red:#e5534b; --green:#4cc38a; --gold:#e3b158;
+    }
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh; padding:0 0 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:0 16px}
+  .stripe{
+    height:8px;max-width:640px;margin:0 auto 22px;border-radius:0 0 6px 6px;
+    background:repeating-linear-gradient(90deg,var(--red) 0 18px,var(--green) 18px 36px,var(--gold) 36px 54px);
+  }
+  header{text-align:center;padding:22px 16px 6px}
+  h1{margin:0;font-size:28px;letter-spacing:.5px;font-weight:800}
+  h1 .hl{color:var(--red)}
+  .sub{color:var(--mut);font-size:14px;margin-top:6px}
+  .apps{margin-top:26px}
+  a.app{
+    display:flex;align-items:center;gap:16px;text-decoration:none;color:var(--ink);
+    background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;margin-top:14px;
+    box-shadow:0 6px 24px rgba(60,40,20,.08);transition:transform .12s, border-color .12s;
+  }
+  a.app:active{transform:scale(.98)}
+  a.app:hover{border-color:var(--red)}
+  .icon{
+    flex:0 0 54px;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;
+    font-size:26px;background:var(--bg2);border:1px solid var(--line);
+  }
+  .app .body{flex:1;min-width:0}
+  .app .body b{font-size:17px;display:block}
+  .app .body span{color:var(--mut);font-size:13px;line-height:1.45;display:block;margin-top:3px}
+  .app .go{color:var(--mut2);font-size:20px}
+  .soon{
+    display:flex;align-items:center;gap:16px;border:1px dashed var(--line);border-radius:16px;
+    padding:18px;margin-top:14px;color:var(--mut2);font-size:14px;
+  }
+  .foot{text-align:center;color:var(--mut2);font-size:11.5px;margin-top:34px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="stripe"></div>
+<header>
+  <h1>🏫 <span class="hl">Elternbeirat</span>-Tools</h1>
+  <div class="sub">Kleine Helfer für Schulfeste und Aktionen</div>
+</header>
+<div class="wrap">
+  <div class="apps">
+    <a class="app" href="adventsmarkt/">
+      <div class="icon">🎄</div>
+      <div class="body">
+        <b>ADVENTSMARKT 2026 · Helferliste</b>
+        <span>Für eine Schicht an den Buden, den Aufbau oder den Abbau eintragen · Plätze werden automatisch verteilt · Übersichtsplan als PDF</span>
+      </div>
+      <div class="go">›</div>
+    </a>
+    <div class="soon">
+      <div class="icon">✨</div>
+      <div>Hier ist Platz für das nächste Tool …</div>
+    </div>
+  </div>
+  <div class="foot">
+    Elternbeirat der Grundschule<br>
+    Tipp fürs Handy: Seite öffnen → Browser-Menü → „Zum Startbildschirm hinzufügen“
+  </div>
+</div>
+</body>
+</html>

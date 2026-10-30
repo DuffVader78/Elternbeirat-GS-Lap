@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#b3261e">
+<title>Adventsmarkt · Eintragen</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎄</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="garland"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="../">‹ Alle Tools</a>
+    <h1>🎄 <span id="titel">Adventsmarkt</span></h1>
+    <div class="sub" id="untertitel">Helferliste für die Buden, den Aufbau und den Abbau</div>
+    <nav class="tabs">
+      <a href="./" aria-current="page">Eintragen</a>
+      <a href="plan.html">Übersichtsplan</a>
+    </nav>
+  </header>
+
+  <div id="loading" class="loading"><span class="spinner"></span> Lade aktuelle Belegung …</div>
+  <div id="msg" class="notice err hidden" role="alert"></div>
+
+  <!-- Bestätigung -->
+  <section id="done" class="card hidden" aria-live="polite"></section>
+
+  <!-- Einträge auf diesem Gerät -->
+  <section id="mine" class="card mine hidden">
+    <h2>Deine Einträge</h2>
+    <div class="muted small">Auf diesem Gerät gespeichert.</div>
+    <div id="mineList"></div>
+  </section>
+
+  <!-- Formular -->
+  <section id="formCard" class="card hidden">
+    <h2 id="formTitle">Eintragen</h2>
+    <div class="muted small" id="formHint">Trag dich ein, die App teilt dir automatisch einen freien Platz zu.</div>
+    <div id="adminBanner" class="notice info hidden"></div>
+    <div id="fullBanner" class="notice info hidden"></div>
+
+    <form id="form" novalidate>
+      <label class="field" for="name">Dein Name</label>
+      <input type="text" id="name" name="name" autocomplete="name" maxlength="60" placeholder="z. B. Anna Müller" required>
+
+      <label class="field">Klasse deines Kindes</label>
+      <div class="classes" id="klassen" role="radiogroup" aria-label="Klasse"></div>
+
+      <label class="field">Welche Schicht?</label>
+      <div class="stack" id="schichten" role="radiogroup" aria-label="Schicht"></div>
+
+      <div id="rolleBox">
+        <label class="field">Bude oder Springer?</label>
+        <div class="stack" id="rollen" role="radiogroup" aria-label="Aufgabe"></div>
+      </div>
+
+      <label class="field">Hilfst du auch beim Auf- oder Abbau?</label>
+      <div class="stack" id="aufabbau"></div>
+
+      <div id="formErr" class="notice err hidden" role="alert"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary block" id="submitBtn">Eintragen</button>
+        <div class="row" id="editBtns" style="justify-content:space-between">
+          <button type="button" class="btn" id="cancelBtn">Abbrechen</button>
+          <button type="button" class="btn danger" id="deleteBtn">Eintrag löschen</button>
+        </div>
+      </div>
+    </form>
+    <p class="muted small" style="margin:16px 0 0">Dein Name und die Klasse deines Kindes stehen im Übersichtsplan, den alle mit dem Link sehen können. Die Angaben werden nur für die Organisation des Adventsmarkts genutzt, nicht weitergegeben und nach dem Markt gelöscht.</p>
+  </section>
+
+  <!-- Eintrag mit Code öffnen -->
+  <section id="codeCard" class="card hidden">
+    <h2>Eintrag ändern oder löschen</h2>
+    <div class="muted small">Gib den Code ein, den du beim Eintragen bekommen hast.</div>
+    <form id="codeForm" class="row" style="margin-top:12px;flex-wrap:nowrap">
+      <input type="text" id="codeInput" placeholder="z. B. K7M-4QX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" style="text-transform:uppercase;letter-spacing:2px">
+      <button type="submit" class="btn" id="codeBtn">Öffnen</button>
+    </form>
+    <div id="codeErr" class="notice err hidden" role="alert"></div>
+    <div class="muted small" style="margin-top:10px">Code vergessen? Melde dich beim Elternbeirat.</div>
+  </section>
+
+  <div class="foot">Elternbeirat · Adventsmarkt</div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = AM.$, $$ = AM.$$, esc = AM.esc;
+  var S = null;          // aktueller Stand vom Server
+  var editing = null;    // { entry, auth: {code} | {pin, id} }
+  var params = new URLSearchParams(location.search);
+
+  function showMsg(text) { var m = $('#msg'); m.textContent = text; m.classList.toggle('hidden', !text); }
+  function formErr(text) { var m = $('#formErr'); m.textContent = text || ''; m.classList.toggle('hidden', !text); if (text) m.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+
+  // ---------- Laden ----------
+  function load() {
+    if (!AM.apiUrl()) {
+      $('#loading').classList.add('hidden');
+      showMsg('Einrichtung fehlt: In adventsmarkt/config.js ist noch keine Web-App-URL eingetragen (siehe README).');
+      return;
+    }
+    AM.api('state').then(function (r) {
+      if (!r.ok) throw new Error(r.error);
+      S = r.state;
+      $('#loading').classList.add('hidden');
+      renderHead();
+      buildStatic();
+      renderMine();
+      renderForm();
+      $('#formCard').classList.remove('hidden');
+      $('#codeCard').classList.remove('hidden');
+      var code = params.get('code');
+      var adminId = params.get('admin');
+      if (code) openByCode(code);
+      else if (adminId && AM.getAdminPin()) openAdmin(adminId);
+    }).catch(function (e) {
+      $('#loading').classList.add('hidden');
+      showMsg(e.message + ' Seite neu laden, um es noch einmal zu versuchen.');
+    });
+  }
+
+  function renderHead() {
+    var c = S.config;
+    $('#titel').textContent = c.titel;
+    $('#untertitel').textContent = c.datum + ' · Helferliste für Buden, Aufbau und Abbau';
+    document.title = c.titel + ' · Eintragen';
+  }
+
+  // ---------- Formular aufbauen ----------
+  function choice(type, name, value, title, desc, extraClass) {
+    return '<label class="choice ' + (extraClass || '') + '"><input type="' + type + '" name="' + name + '" value="' + esc(value) + '">' +
+      '<span><span class="t">' + title + '</span>' + (desc != null ? '<span class="d" data-desc="' + esc(value) + '">' + desc + '</span>' : '') + '</span></label>';
+  }
+
+  function buildStatic() {
+    var c = S.config, z = c.zeiten;
+    $('#klassen').innerHTML = c.klassen.map(function (k) { return choice('radio', 'klasse', k, esc(k)); }).join('');
+    $('#schichten').innerHTML =
+      choice('radio', 'schicht', '1', 'Schicht 1 · ' + esc(z.s1), '') +
+      choice('radio', 'schicht', '2', 'Schicht 2 · ' + esc(z.s2), '') +
+      choice('radio', 'schicht', 'beide', 'Beide Schichten · ' + esc(z.s1.split('–')[0]) + '–' + esc(z.s2.split('–')[1] || ''), '') +
+      choice('radio', 'schicht', 'keine', 'Keine Schicht', 'Ich helfe nur beim Aufbau und/oder Abbau.');
+    $('#rollen').innerHTML =
+      choice('radio', 'rolle', 'bude', 'An einer Bude', '') +
+      choice('radio', 'rolle', 'springer', 'Springer:in', '');
+    $('#aufabbau').innerHTML =
+      choice('checkbox', 'aufbau', 'aufbau', 'Aufbau · ' + esc(z.aufbau), '', 'check') +
+      choice('checkbox', 'abbau', 'abbau', 'Abbau · ' + esc(z.abbau), '', 'check');
+    $('#form').addEventListener('change', renderForm);
+  }
+
+  function val(name) { var el = $('input[name="' + name + '"]:checked'); return el ? el.value : ''; }
+  function setDesc(value, html) { var d = $('[data-desc="' + value + '"]'); if (d) d.innerHTML = html; }
+  function setEnabled(name, value, on) {
+    var el = $('input[name="' + name + '"][value="' + value + '"]');
+    el.disabled = !on;
+    if (!on && el.checked) el.checked = false;
+  }
+  function frei(n, total, what, fullText) {
+    return n > 0 ? 'noch ' + n + ' von ' + total + ' ' + what + ' frei' : '<span class="full">' + fullText + '</span>';
+  }
+
+  function renderForm() {
+    if (!S) return;
+    var c = S.config, f = AM.freeCounts(S, editing && editing.entry.id);
+    var budeTotal = c.buden * c.proBude;
+    var a1 = f.s1.bude > 0 || f.s1.springer > 0;
+    var a2 = f.s2.bude > 0 || f.s2.springer > 0;
+    var bothBude = f.s1.bude > 0 && f.s2.bude > 0, bothSpr = f.s1.springer > 0 && f.s2.springer > 0;
+    var aAuf = f.aufbau > 0, aAb = f.abbau > 0;
+
+    function shiftDesc(fs) {
+      return frei(fs.bude, budeTotal, 'Budenplätzen', 'Buden voll') + ' · ' + frei(fs.springer, c.springer, 'Springer-Plätzen', 'Springer voll');
+    }
+    setDesc('1', shiftDesc(f.s1));
+    setDesc('2', shiftDesc(f.s2));
+    setDesc('beide', bothBude || bothSpr ? 'Wir versuchen, dich beide Stunden an dieselbe Bude zu setzen.' : '<span class="full">nicht mehr möglich</span>');
+    setEnabled('schicht', '1', a1);
+    setEnabled('schicht', '2', a2);
+    setEnabled('schicht', 'beide', bothBude || bothSpr);
+    setEnabled('schicht', 'keine', aAuf || aAb || (editing && (editing.entry.aufbau || editing.entry.abbau)));
+
+    // keine Schicht frei -> Hinweis und Auf-/Abbau anbieten
+    var noShift = !a1 && !a2;
+    var fb = $('#fullBanner');
+    if (noShift && (aAuf || aAb)) {
+      fb.innerHTML = '<b>Alle Schichten an den Buden sind besetzt.</b> Beim ' +
+        (aAuf && aAb ? 'Aufbau und Abbau' : aAuf ? 'Aufbau' : 'Abbau') + ' wird aber noch Hilfe gebraucht. Magst du dort mit anpacken?';
+      fb.classList.remove('hidden');
+      if (!val('schicht')) $('input[name="schicht"][value="keine"]').checked = true;
+    } else fb.classList.add('hidden');
+
+    var allFull = noShift && !aAuf && !aAb;
+    $('#form').classList.toggle('hidden', allFull && !editing);
+    if (allFull && !editing) { fb.innerHTML = '<b>Alle Plätze sind vergeben.</b> Vielen Dank an alle, die sich eingetragen haben!'; fb.classList.remove('hidden'); }
+
+    // Rolle
+    var sch = val('schicht');
+    $('#rolleBox').classList.toggle('hidden', !sch || sch === 'keine');
+    var bude = sch === '1' ? f.s1.bude > 0 : sch === '2' ? f.s2.bude > 0 : sch === 'beide' ? bothBude : true;
+    var spr = sch === '1' ? f.s1.springer > 0 : sch === '2' ? f.s2.springer > 0 : sch === 'beide' ? bothSpr : true;
+    setEnabled('rolle', 'bude', bude);
+    setEnabled('rolle', 'springer', spr);
+    setDesc('bude', bude ? 'Verkauf zu zweit an einer der ' + c.buden + ' Buden.' : '<span class="full">in dieser Schicht voll</span>');
+    setDesc('springer', spr ? 'Springt bei Pausen und Engpässen ein. Je ein:e Springer:in ist für zwei Buden zuständig.' : '<span class="full">in dieser Schicht voll</span>');
+    if (sch && sch !== 'keine' && !val('rolle')) {
+      if (bude && !spr) $('input[name="rolle"][value="bude"]').checked = true;
+      if (spr && !bude) $('input[name="rolle"][value="springer"]').checked = true;
+    }
+
+    // Auf-/Abbau (eigener Platz zählt als frei)
+    setEnabled('aufbau', 'aufbau', aAuf);
+    setEnabled('abbau', 'abbau', aAb);
+    setDesc('aufbau', frei(f.aufbau, c.aufbau, 'Plätzen', 'alle Plätze vergeben'));
+    setDesc('abbau', frei(f.abbau, c.abbau, 'Plätzen', 'alle Plätze vergeben'));
+  }
+
+  // ---------- Meine Einträge ----------
+  function summary(x) {
+    var z = S.config.zeiten, parts = [];
+    if (x.aufbau) parts.push('Aufbau');
+    if (x.s1) parts.push('Schicht 1: ' + AM.slotText(x.s1));
+    if (x.s2) parts.push('Schicht 2: ' + AM.slotText(x.s2));
+    if (x.abbau) parts.push('Abbau');
+    return parts.join(' · ');
+  }
+
+  function renderMine() {
+    var mine = AM.loadMine();
+    var byId = {};
+    S.entries.forEach(function (x) { byId[x.id] = x; });
+    var list = mine.filter(function (m) { if (byId[m.id]) return true; AM.forgetMine(m.id); return false; });
+    $('#mine').classList.toggle('hidden', !list.length);
+    $('#mineList').innerHTML = list.map(function (m) {
+      var x = byId[m.id];
+      return '<div class="item"><div class="who">' + esc(x.name) + ' <span class="muted">(' + esc(x.klasse) + ')</span></div>' +
+        '<div class="small muted">' + esc(summary(x)) + '</div>' +
+        '<div class="small muted">Code: <b>' + esc(AM.fmtCode(m.code)) + '</b></div>' +
+        '<div class="row" style="margin-top:8px"><button class="btn small" data-edit="' + esc(m.id) + '">Ändern</button>' +
+        '<button class="btn small danger" data-del="' + esc(m.id) + '">Löschen</button></div></div>';
+    }).join('');
+  }
+
+  $('#mineList').addEventListener('click', function (ev) {
+    var t = ev.target.closest('button'); if (!t) return;
+    var id = t.dataset.edit || t.dataset.del;
+    var m = AM.loadMine().filter(function (x) { return x.id === id; })[0];
+    if (!m) return;
+    if (t.dataset.edit) {
+      AM.busy(t, true, 'Lade …');
+      AM.api('get', { code: m.code, id: m.id }).then(function (r) {
+        AM.busy(t, false);
+        if (!r.ok) { showMsg(r.error); return; }
+        S = r.state; startEdit(r.entry, { code: m.code });
+      }).catch(function (e) { AM.busy(t, false); showMsg(e.message); });
+    } else {
+      var x = S.entries.filter(function (e) { return e.id === id; })[0];
+      if (!confirm('Eintrag von ' + (x ? x.name : 'dir') + ' wirklich löschen? Die Plätze werden wieder frei.')) return;
+      AM.busy(t, true, 'Lösche …');
+      AM.api('delete', { code: m.code, id: m.id }).then(function (r) {
+        if (!r.ok) { AM.busy(t, false); showMsg(r.error); return; }
+        AM.forgetMine(id); S = r.state; renderMine(); renderForm(); showMsg('');
+        flash('Der Eintrag wurde gelöscht.');
+      }).catch(function (e) { AM.busy(t, false); showMsg(e.message); });
+    }
+  });
+
+  function flash(text) {
+    var d = $('#done');
+    d.innerHTML = '<div class="notice ok" style="margin:0">' + esc(text) + '</div>';
+    d.classList.remove('hidden');
+    $('#formCard').classList.remove('hidden');
+    $('#codeCard').classList.remove('hidden');
+    d.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  // ---------- Bearbeiten ----------
+  function startEdit(entry, auth) {
+    editing = { entry: entry, auth: auth };
+    $('#done').classList.add('hidden');
+    $('#formCard').classList.remove('hidden');
+    $('#codeCard').classList.remove('hidden');
+    $('#form').reset();
+    $('#name').value = entry.name;
+    var k = $('input[name="klasse"][value="' + entry.klasse + '"]'); if (k) k.checked = true;
+    var sch = entry.s1 && entry.s2 ? 'beide' : entry.s1 ? '1' : entry.s2 ? '2' : 'keine';
+    $('input[name="schicht"][value="' + sch + '"]').checked = true;
+    var slot = entry.s1 || entry.s2;
+    if (slot) $('input[name="rolle"][value="' + (/^Springer/.test(slot) ? 'springer' : 'bude') + '"]').checked = true;
+    $('input[name="aufbau"]').checked = !!entry.aufbau;
+    $('input[name="abbau"]').checked = !!entry.abbau;
+    $('#formTitle').textContent = 'Eintrag ändern';
+    $('#formHint').textContent = 'Aktuell: ' + summary(entry) + '. Bleibt deine Schicht gleich, behältst du deinen Platz.';
+    $('#submitBtn').textContent = 'Änderungen speichern';
+    $('#editBtns').classList.remove('hidden');
+    var ab = $('#adminBanner');
+    if (auth.pin) { ab.textContent = 'Verwaltung: Du bearbeitest den Eintrag von ' + entry.name + ' (Code ' + AM.fmtCode(entry.code) + ').'; ab.classList.remove('hidden'); }
+    else ab.classList.add('hidden');
+    formErr('');
+    renderForm();
+    $('#formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function stopEdit() {
+    editing = null;
+    $('#form').reset();
+    $('#formTitle').textContent = 'Eintragen';
+    $('#formHint').textContent = 'Trag dich ein, die App teilt dir automatisch einen freien Platz zu.';
+    $('#submitBtn').textContent = 'Eintragen';
+    $('#editBtns').classList.add('hidden');
+    $('#adminBanner').classList.add('hidden');
+    formErr('');
+    if (params.has('code') || params.has('admin')) history.replaceState(null, '', location.pathname);
+    renderForm();
+  }
+
+  $('#cancelBtn').addEventListener('click', stopEdit);
+  $('#deleteBtn').addEventListener('click', function () {
+    if (!editing) return;
+    if (!confirm('Eintrag von ' + editing.entry.name + ' wirklich löschen? Die Plätze werden wieder frei.')) return;
+    var btn = this; AM.busy(btn, true, 'Lösche …');
+    AM.api('delete', Object.assign({ id: editing.entry.id }, editing.auth)).then(function (r) {
+      AM.busy(btn, false);
+      if (!r.ok) { formErr(r.error); return; }
+      AM.forgetMine(editing.entry.id); S = r.state; stopEdit(); renderMine();
+      flash('Der Eintrag wurde gelöscht.');
+    }).catch(function (e) { AM.busy(btn, false); formErr(e.message); });
+  });
+
+  function openByCode(code) {
+    var btn = $('#codeBtn'); AM.busy(btn, true, '…');
+    $('#codeErr').classList.add('hidden');
+    AM.api('get', { code: code }).then(function (r) {
+      AM.busy(btn, false);
+      if (!r.ok) { $('#codeErr').textContent = r.error; $('#codeErr').classList.remove('hidden'); return; }
+      S = r.state; AM.rememberMine(r.entry); renderMine();
+      startEdit(r.entry, { code: r.entry.code });
+    }).catch(function (e) { AM.busy(btn, false); $('#codeErr').textContent = e.message; $('#codeErr').classList.remove('hidden'); });
+  }
+
+  function openAdmin(id) {
+    AM.api('get', { pin: AM.getAdminPin(), id: id }).then(function (r) {
+      if (!r.ok) { showMsg(r.error); return; }
+      S = r.state; startEdit(r.entry, { pin: AM.getAdminPin() });
+    }).catch(function (e) { showMsg(e.message); });
+  }
+
+  $('#codeForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var c = $('#codeInput').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.length !== 6) { $('#codeErr').textContent = 'Der Code hat 6 Zeichen.'; $('#codeErr').classList.remove('hidden'); return; }
+    openByCode(c);
+  });
+
+  // ---------- Absenden ----------
+  $('#form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    formErr('');
+    var data = {
+      name: $('#name').value.replace(/\s+/g, ' ').trim(),
+      klasse: val('klasse'),
+      schicht: val('schicht'),
+      rolle: val('rolle'),
+      aufbau: $('input[name="aufbau"]').checked,
+      abbau: $('input[name="abbau"]').checked
+    };
+    if (data.name.length < 2) { formErr('Bitte deinen Namen eintragen.'); $('#name').focus(); return; }
+    if (!data.klasse) return formErr('Bitte die Klasse deines Kindes auswählen.');
+    if (!data.schicht) return formErr('Bitte eine Schicht auswählen.');
+    if (data.schicht !== 'keine' && !data.rolle) return formErr('Bitte auswählen: an einer Bude oder als Springer:in.');
+    if (data.schicht === 'keine' && !data.aufbau && !data.abbau) return formErr('Bitte Aufbau und/oder Abbau ankreuzen.');
+    if (data.schicht === 'keine') data.rolle = '';
+
+    if (!editing) {
+      var dup = S.entries.filter(function (x) { return x.name.toLowerCase() === data.name.toLowerCase(); })[0];
+      if (dup && !confirm('Es gibt schon einen Eintrag für „' + dup.name + '“. Trotzdem einen weiteren anlegen?\n\nZum Ändern deines bisherigen Eintrags auf „Abbrechen“ tippen und unten deinen Code eingeben.')) return;
+    }
+
+    var btn = $('#submitBtn');
+    AM.busy(btn, true, editing ? 'Speichere …' : 'Trage ein …');
+    var call = editing
+      ? AM.api('update', Object.assign({ id: editing.entry.id, data: data }, editing.auth))
+      : AM.api('create', { data: data });
+    var wasEdit = !!editing, wasAdmin = editing && editing.auth.pin;
+    call.then(function (r) {
+      AM.busy(btn, false);
+      if (r.state) S = r.state;
+      if (!r.ok) { renderForm(); formErr(r.error); return; }
+      if (!wasAdmin) AM.rememberMine(r.entry);
+      stopEdit();
+      $('#form').reset(); renderForm();
+      renderMine();
+      showDone(r.entry, wasEdit, wasAdmin);
+    }).catch(function (e) { AM.busy(btn, false); formErr(e.message); });
+  });
+
+  // ---------- Bestätigung ----------
+  function showDone(x, wasEdit, wasAdmin) {
+    var z = S.config.zeiten, items = [];
+    function partners(sh) {
+      return S.entries.filter(function (e) { return e.id !== x.id && e[sh] === x[sh]; })
+        .map(function (e) { return esc(e.name) + ' (' + esc(e.klasse) + ')'; });
+    }
+    function shiftItem(sh, nr) {
+      var v = x[sh]; if (!v) return;
+      var m = v.match(/^Springer (\d+)$/), txt;
+      if (m) txt = 'Springer:in für ' + AM.springerBuden(Number(m[1]));
+      else {
+        var p = partners(sh);
+        txt = v + (p.length ? ', zusammen mit ' + p.join(', ') : ', dein:e Partner:in wird noch gesucht');
+      }
+      items.push('<li><b>Schicht ' + nr + ' · ' + esc(z[sh]) + '</b>' + txt + '</li>');
+    }
+    if (x.aufbau) items.push('<li><b>Aufbau · ' + esc(z.aufbau) + '</b>Danke fürs Mit-Anpacken!</li>');
+    shiftItem('s1', 1); shiftItem('s2', 2);
+    if (x.abbau) items.push('<li><b>Abbau · ' + esc(z.abbau) + '</b>Danke fürs Mit-Aufräumen!</li>');
+    var link = location.origin + location.pathname + '?code=' + x.code;
+    var d = $('#done');
+    d.innerHTML =
+      '<h2>' + (wasEdit ? 'Änderung gespeichert' : 'Danke, ' + esc(x.name.split(' ')[0]) + '!') + '</h2>' +
+      '<div class="muted">' + (wasAdmin ? 'Eintrag von ' + esc(x.name) + ':' : 'Du bist eingeteilt:') + '</div>' +
+      '<ul class="assign">' + items.join('') + '</ul>' +
+      (wasAdmin ? '' :
+      '<div class="codebox"><div class="lbl">Dein persönlicher Code</div><div class="code">' + esc(AM.fmtCode(x.code)) + '</div></div>' +
+      '<div class="small muted">Dieses Gerät merkt sich deinen Eintrag. Von einem anderen Gerät aus kannst du ihn mit dem Code ändern oder löschen. Am besten Code oder Link kurz notieren.</div>') +
+      '<div class="actions">' +
+      (wasAdmin ? '' : '<button class="btn" id="copyLink">Link zum Ändern kopieren</button>') +
+      '<a class="btn primary" href="plan.html">Zum Übersichtsplan</a>' +
+      '<button class="linkbtn" id="another">Noch jemanden eintragen</button></div>';
+    d.classList.remove('hidden');
+    $('#formCard').classList.add('hidden');
+    $('#codeCard').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    var cl = $('#copyLink');
+    if (cl) cl.addEventListener('click', function () {
+      var ok = function () { cl.textContent = '✓ Link kopiert'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, function () { prompt('Link zum Kopieren:', link); });
+      else prompt('Link zum Kopieren:', link);
+    });
+    $('#another').addEventListener('click', function () {
+      d.classList.add('hidden');
+      $('#formCard').classList.remove('hidden'); $('#codeCard').classList.remove('hidden');
+      $('#formCard').scrollIntoView({ behavior: 'smooth' }); $('#name').focus();
+    });
+  }
+
+  $('#editBtns').classList.add('hidden');
+  load();
+})();
+</script>
+</body>
+</html>
