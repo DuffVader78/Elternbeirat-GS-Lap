@@ -5,8 +5,8 @@ Kleine Web-Apps für den Elternbeirat, gehostet über GitHub Pages.
 | Pfad | Inhalt |
 |---|---|
 | `index.html` | Startseite mit allen Tools |
-| `adventsmarkt/` | Helferliste Adventsmarkt 2026: Eintragen (`index.html`) und Übersichtsplan mit PDF (`plan.html`) |
-| `apps-script/Code.gs` | Backend für die Helferliste (läuft in Google Apps Script, nicht auf GitHub) |
+| `adventsmarkt/` | Adventsmarkt 2026: Helferliste (`index.html`), Plätzchen-Liste (`plaetzchen.html`) und Übersicht mit PDF (`plan.html`) |
+| `apps-script/Code.gs` | Backend für Helfer- und Plätzchen-Liste (läuft in Google Apps Script, nicht auf GitHub) |
 | `lib/` | jsPDF und jsPDF-AutoTable (MIT-Lizenz) für den PDF-Export |
 
 ---
@@ -77,6 +77,51 @@ window.APP_CONFIG = {
 3. Den Testeintrag in der App wieder löschen.
 
 Den Link für die Eltern-WhatsApp-Gruppe am besten direkt auf `…/adventsmarkt/` setzen.
+
+---
+
+## Update: Plätzchen-Liste hinzufügen
+
+Wenn die Helferliste schon läuft, sind für die Plätzchen nur zwei Schritte nötig:
+
+1. **Skript aktualisieren:** Im Apps-Script-Editor den Inhalt von `Code.gs` komplett durch die neue Version ersetzen und speichern. Dann **Bereitstellen → Bereitstellungen verwalten → Stift-Symbol → Version: Neue Version → Bereitstellen**. Die URL bleibt gleich, `config.js` muss nicht geändert werden.
+2. **Dateien auf GitHub ersetzen** (alle außer `adventsmarkt/config.js`):
+   - Hauptordner: `index.html`, `README.md`
+   - `adventsmarkt/`: `index.html`, `plan.html`, `plaetzchen.html` (neu), `app.js`, `style.css`
+   - `apps-script/`: `Code.gs`
+
+Das Tabellenblatt „Plaetzchen“ legt das Skript beim ersten Aufruf selbst an. Die bestehenden Helfer-Einträge bleiben erhalten.
+
+Link für die Eltern: `…/adventsmarkt/plaetzchen.html`
+
+---
+
+## So funktioniert die Plätzchen-Liste
+
+- **Eintragen:** Name, Plätzchensorte (Freitext), ungefähre Stückzahl und ob man beim Einpacken hilft.
+- **Höchstens 3 Familien pro Sorte.** Ähnliche Schreibweisen werden zusammen gezählt, z. B. „Vanillekipferl“, „Vanille-Kipferln“, „vanille kipferl“ und „Vanillekipfel“. Schon beim Tippen sieht man, ob die Sorte noch frei ist, und eine volle Sorte lässt sich nicht mehr eintragen.
+- **Wunschsorten:** 10 gängige Sorten werden als „Gesucht“ angezeigt und lassen sich antippen. Sobald jemand eine davon einträgt, verschwindet sie aus der Liste.
+- **Andere Namen für dieselbe Sorte** (z. B. Hildabrötchen = Spitzbuben, Husarenkrapfen = Engelsaugen) stehen in `Code.gs` unter `synonyme` und werden gemeinsam gezählt.
+- **Tüten-Ziel:** Aus der Gesamtstückzahl berechnet die App die Tüten (Stückzahl ÷ Plätzchen pro Tüte) und zeigt sie als Fortschrittsbalken: Ziel 150, Zusatzziel 200, alles darüber ist Bonus.
+- **Übersicht:** Unter „Übersicht → Plätzchen“ stehen der Balken, die Wunschsorten, alle Sorten mit Bäcker:innen und die Helfer:innen fürs Einpacken. Das PDF enthält Helferplan und Plätzchen-Seite.
+- **Ändern und Löschen** funktioniert wie bei der Helferliste mit persönlichem Code, die Verwaltung mit derselben Admin-PIN.
+- **Falsch zusammengefasst?** In der Tabelle im Blatt „Plaetzchen“ die Spalte **Gruppe** korrigieren. Die App zählt nach dieser Spalte.
+
+### Plätzchen anpassen
+
+Alles steht in `Code.gs` im Block `CONFIG` unter `plaetzchen`:
+
+| Einstellung | Bedeutung |
+|---|---|
+| `stueckProTuete` | geschätzte Plätzchen pro Tüte, aktuell 10. Nach einer Probetüte anpassen. |
+| `zielTueten`, `zusatzZielTueten` | 150 und 200 |
+| `maxProSorte` | 3 |
+| `wunschsorten` | die 10 gesuchten Sorten |
+| `synonyme` | andere Namen, die zur selben Sorte zählen |
+| `abgabe`, `einpacken` | Texte für Abgabe und Einpacken |
+| `offen` | `false` schließt die Plätzchen-Liste |
+
+Danach wie immer eine neue Version bereitstellen.
 
 ---
 

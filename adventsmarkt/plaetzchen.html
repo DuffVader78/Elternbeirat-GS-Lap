@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#b3261e">
+<title>Adventsmarkt · Plätzchen</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍪</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="garland"></div>
+<div class="wrap">
+  <header class="top">
+    <a class="back" href="../">‹ Alle Tools</a>
+    <h1>🍪 <span id="titel">Adventsmarkt</span></h1>
+    <div class="sub" id="untertitel">Plätzchen-Liste</div>
+    <nav class="tabs">
+      <a href="./">Helfer</a>
+      <a href="plaetzchen.html" aria-current="page">Plätzchen</a>
+      <a href="plan.html">Übersicht</a>
+    </nav>
+  </header>
+
+  <div id="loading" class="loading"><span class="spinner"></span> Lade aktuellen Stand …</div>
+  <div id="msg" class="notice err hidden" role="alert"></div>
+
+  <section id="goalCard" class="card hidden">
+    <div id="goal"></div>
+    <div class="infobox" style="margin-top:14px">
+      <div>📦 <b>Abgabe:</b> <span id="abgabe"></span></div>
+      <div>🎀 <b>Einpacken:</b> <span id="einpackenInfo"></span></div>
+    </div>
+  </section>
+
+  <section id="done" class="card hidden" aria-live="polite"></section>
+
+  <section id="mine" class="card mine hidden">
+    <h2>Deine Plätzchen</h2>
+    <div class="muted small">Auf diesem Gerät gespeichert.</div>
+    <div id="mineList"></div>
+  </section>
+
+  <section id="formCard" class="card hidden">
+    <h2 id="formTitle">Plätzchen eintragen</h2>
+    <div class="muted small" id="formHint">Damit wir eine bunte Mischung bekommen, backen höchstens <span class="maxN">3</span> Familien dieselbe Sorte.</div>
+    <div id="adminBanner" class="notice info hidden"></div>
+    <div id="closedBanner" class="notice info hidden"></div>
+
+    <form id="form" novalidate>
+      <label class="field" for="name">Dein Name</label>
+      <input type="text" id="name" autocomplete="name" maxlength="60" placeholder="z. B. Anna Müller" required>
+
+      <label class="field" for="sorte">Welche Plätzchen backst du?</label>
+      <input type="text" id="sorte" maxlength="50" placeholder="z. B. Vanillekipferl" autocomplete="off" required>
+      <div id="sorteHint" class="hint hidden" aria-live="polite"></div>
+      <div id="wishWrap" class="hidden">
+        <div class="small muted" style="margin-top:12px">⭐ <b>Gesucht werden noch</b> (antippen zum Übernehmen):</div>
+        <div class="chips" id="wishChips"></div>
+      </div>
+      <div id="takenWrap" class="hidden">
+        <div class="small muted" style="margin-top:12px">Schon dabei:</div>
+        <div class="chips" id="takenChips"></div>
+      </div>
+
+      <label class="field" for="stueck">Wie viele Plätzchen ungefähr?</label>
+      <input type="number" id="stueck" inputmode="numeric" min="1" max="1000" step="1" placeholder="z. B. 60">
+      <div class="calc" id="calc">Daraus berechnen wir, wie viele Tüten wir zusammen füllen können.</div>
+
+      <label class="field">Hilfst du beim Einpacken?</label>
+      <label class="choice check"><input type="checkbox" id="einpacken"><span><span class="t">Ja, ich helfe beim Einpacken</span><span class="d" id="einpackenD"></span></span></label>
+
+      <div id="formErr" class="notice err hidden" role="alert"></div>
+      <div class="actions">
+        <button type="submit" class="btn primary block" id="submitBtn">Eintragen</button>
+        <div class="row hidden" id="editBtns" style="justify-content:space-between">
+          <button type="button" class="btn" id="cancelBtn">Abbrechen</button>
+          <button type="button" class="btn danger" id="deleteBtn">Eintrag löschen</button>
+        </div>
+      </div>
+    </form>
+    <p class="muted small" style="margin:16px 0 0">Dein Name und deine Sorte stehen in der Übersicht, die alle mit dem Link sehen können. Die Angaben werden nur für die Organisation des Adventsmarkts genutzt, nicht weitergegeben und nach dem Markt gelöscht.</p>
+  </section>
+
+  <section id="codeCard" class="card hidden">
+    <h2>Eintrag ändern oder löschen</h2>
+    <div class="muted small">Gib den Code ein, den du beim Eintragen bekommen hast.</div>
+    <form id="codeForm" class="row" style="margin-top:12px;flex-wrap:nowrap">
+      <input type="text" id="codeInput" placeholder="z. B. K7M-4QX" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="9" style="text-transform:uppercase;letter-spacing:2px">
+      <button type="submit" class="btn" id="codeBtn">Öffnen</button>
+    </form>
+    <div id="codeErr" class="notice err hidden" role="alert"></div>
+    <div class="muted small" style="margin-top:10px">Code vergessen? Melde dich beim Elternbeirat.</div>
+  </section>
+
+  <div class="foot">Elternbeirat · Adventsmarkt</div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = AM.$, esc = AM.esc;
+  var S = null, editing = null, blocked = false;
+  var params = new URLSearchParams(location.search);
+  var KIND = 'keks';
+
+  function P() { return S.config.plaetzchen; }
+  function showMsg(t) { $('#msg').textContent = t; $('#msg').classList.toggle('hidden', !t); }
+  function formErr(t) { var m = $('#formErr'); m.textContent = t || ''; m.classList.toggle('hidden', !t); if (t) m.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+  function codeErr(t) { var m = $('#codeErr'); m.textContent = t || ''; m.classList.toggle('hidden', !t); }
+
+  function load() {
+    if (!AM.apiUrl()) { $('#loading').classList.add('hidden'); showMsg('Einrichtung fehlt: In adventsmarkt/config.js ist noch keine Web-App-URL eingetragen (siehe README).'); return; }
+    AM.api('state').then(function (r) {
+      if (!r.ok) throw new Error(r.error);
+      if (!r.state.config.plaetzchen) throw new Error('Das Skript in der Google Tabelle ist noch die alte Version ohne Plätzchen. Bitte Code.gs aktualisieren und eine neue Version bereitstellen (siehe README).');
+      S = r.state;
+      $('#loading').classList.add('hidden');
+      ['#goalCard', '#formCard', '#codeCard'].forEach(function (s) { $(s).classList.remove('hidden'); });
+      renderAll();
+      if (params.get('code')) openByCode(params.get('code'));
+      else if (params.get('admin') && AM.getAdminPin()) openAdmin(params.get('admin'));
+    }).catch(function (e) { $('#loading').classList.add('hidden'); showMsg(e.message); });
+  }
+
+  function renderAll() {
+    var c = S.config;
+    $('#titel').textContent = c.titel;
+    $('#untertitel').textContent = c.datum + ' · Plätzchen-Liste';
+    document.title = c.titel + ' · Plätzchen';
+    $('#abgabe').textContent = P().abgabe;
+    $('#einpackenInfo').textContent = P().einpacken;
+    $('#einpackenD').textContent = P().einpacken;
+    AM.$$('.maxN').forEach(function (e) { e.textContent = P().maxProSorte; });
+    $('#goal').innerHTML = AM.goalBar(S, true);
+    var closed = !P().offen && !editing;
+    $('#closedBanner').textContent = closed ? 'Die Plätzchen-Liste ist geschlossen. Vielen Dank an alle Bäckerinnen und Bäcker!' : '';
+    $('#closedBanner').classList.toggle('hidden', !closed);
+    $('#form').classList.toggle('hidden', closed);
+    renderChips(); renderHint(); renderCalc(); renderMine();
+  }
+
+  // ---------- Sorten ----------
+  function groups() { return AM.keksGroups(S, editing && editing.entry.id); }
+
+  function renderChips() {
+    var g = groups(), max = P().maxProSorte;
+    var wish = g.filter(function (x) { return x.wunsch && x.count === 0; });
+    var taken = g.filter(function (x) { return x.count > 0; }).sort(function (a, b) { return a.name.localeCompare(b.name, 'de'); });
+    $('#wishChips').innerHTML = wish.map(function (x) { return '<button type="button" class="chip wish" data-sorte="' + esc(x.name) + '">' + esc(x.name) + '</button>'; }).join('');
+    $('#takenChips').innerHTML = taken.map(function (x) {
+      var full = x.count >= max;
+      return '<button type="button" class="chip' + (full ? ' full' : '') + '"' + (full ? ' disabled' : '') + ' data-sorte="' + esc(x.name) + '">' +
+        esc(x.name) + '<span class="n">' + x.count + '/' + max + '</span></button>';
+    }).join('');
+    $('#wishWrap').classList.toggle('hidden', !wish.length);
+    $('#takenWrap').classList.toggle('hidden', !taken.length);
+  }
+
+  function chipClick(ev) {
+    var b = ev.target.closest('button[data-sorte]'); if (!b || b.disabled) return;
+    $('#sorte').value = b.dataset.sorte; renderHint(); $('#stueck').focus();
+  }
+  $('#wishChips').addEventListener('click', chipClick);
+  $('#takenChips').addEventListener('click', chipClick);
+
+  function renderHint() {
+    var h = $('#sorteHint'), v = $('#sorte').value.trim(), max = P().maxProSorte;
+    blocked = false;
+    if (v.length < 3) { h.classList.add('hidden'); return; }
+    var g = AM.matchGroup(v, groups()), cls, html;
+    if (g && g.count >= max) {
+      blocked = true; cls = 'bad';
+      html = 'Von <b>„' + esc(g.name) + '“</b> gibt es schon genug (' + g.count + ' von ' + max + '). Magst du eine andere Sorte backen?';
+    } else if (g && g.wunsch && g.count === 0) {
+      cls = 'good'; html = '⭐ Super, <b>„' + esc(g.name) + '“</b> steht auf unserer Wunschliste!';
+    } else if (g) {
+      cls = 'warn';
+      html = 'Wird zusammen mit <b>„' + esc(g.name) + '“</b> gezählt: ' + (g.count === 1 ? 'eine Familie backt' : g.count + ' Familien backen') + ' diese Sorte schon, ' + (max - g.count) + (max - g.count === 1 ? ' Platz ist' : ' Plätze sind') + ' noch frei.';
+    } else { cls = ''; html = 'Neue Sorte, schön! Danke für die Abwechslung.'; }
+    h.className = 'hint ' + cls; h.innerHTML = html;
+  }
+  $('#sorte').addEventListener('input', renderHint);
+
+  function renderCalc() {
+    var n = Math.round(Number($('#stueck').value));
+    $('#calc').innerHTML = n >= 1 ? 'Das reicht für etwa <b>' + Math.max(0, Math.round(n / P().stueckProTuete * 10) / 10).toLocaleString('de-DE') + ' Tüten</b> (bei ca. ' + P().stueckProTuete + ' Plätzchen pro Tüte).'
+      : 'Daraus berechnen wir, wie viele Tüten wir zusammen füllen können.';
+  }
+  $('#stueck').addEventListener('input', renderCalc);
+
+  // ---------- Meine Einträge ----------
+  function renderMine() {
+    var byId = {};
+    S.kekse.forEach(function (x) { byId[x.id] = x; });
+    var list = AM.loadMine(KIND).filter(function (m) { if (byId[m.id]) return true; AM.forgetMine(m.id, KIND); return false; });
+    $('#mine').classList.toggle('hidden', !list.length);
+    $('#mineList').innerHTML = list.map(function (m) {
+      var x = byId[m.id];
+      return '<div class="item"><div class="who">' + esc(x.sorte) + ' <span class="muted">· ca. ' + x.stueck + ' Stück</span></div>' +
+        '<div class="small muted">' + esc(x.name) + (x.einpacken ? ' · hilft beim Einpacken' : '') + '</div>' +
+        '<div class="small muted">Code: <b>' + esc(AM.fmtCode(m.code)) + '</b></div>' +
+        '<div class="row" style="margin-top:8px"><button class="btn small" data-edit="' + esc(m.id) + '">Ändern</button>' +
+        '<button class="btn small danger" data-del="' + esc(m.id) + '">Löschen</button></div></div>';
+    }).join('');
+  }
+
+  $('#mineList').addEventListener('click', function (ev) {
+    var t = ev.target.closest('button'); if (!t) return;
+    var id = t.dataset.edit || t.dataset.del;
+    var m = AM.loadMine(KIND).filter(function (x) { return x.id === id; })[0]; if (!m) return;
+    if (t.dataset.edit) {
+      AM.busy(t, true, 'Lade …');
+      AM.api('keks_get', { code: m.code, id: m.id }).then(function (r) {
+        AM.busy(t, false);
+        if (!r.ok) { showMsg(r.error); return; }
+        S = r.state; startEdit(r.entry, { code: m.code });
+      }).catch(function (e) { AM.busy(t, false); showMsg(e.message); });
+    } else {
+      var x = S.kekse.filter(function (e) { return e.id === id; })[0];
+      if (!confirm('„' + (x ? x.sorte : 'Eintrag') + '“ wirklich löschen?')) return;
+      AM.busy(t, true, 'Lösche …');
+      AM.api('keks_delete', { code: m.code, id: m.id }).then(function (r) {
+        if (!r.ok) { AM.busy(t, false); showMsg(r.error); return; }
+        AM.forgetMine(id, KIND); S = r.state; renderAll(); flash('Der Eintrag wurde gelöscht.');
+      }).catch(function (e) { AM.busy(t, false); showMsg(e.message); });
+    }
+  });
+
+  function flash(text) {
+    var d = $('#done');
+    d.innerHTML = '<div class="notice ok" style="margin:0">' + esc(text) + '</div>';
+    d.classList.remove('hidden'); $('#formCard').classList.remove('hidden'); $('#codeCard').classList.remove('hidden');
+    d.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+
+  // ---------- Bearbeiten ----------
+  function startEdit(x, auth) {
+    editing = { entry: x, auth: auth };
+    $('#done').classList.add('hidden'); $('#formCard').classList.remove('hidden'); $('#codeCard').classList.remove('hidden');
+    $('#name').value = x.name; $('#sorte').value = x.sorte; $('#stueck').value = x.stueck; $('#einpacken').checked = !!x.einpacken;
+    $('#formTitle').textContent = 'Eintrag ändern';
+    $('#submitBtn').textContent = 'Änderungen speichern';
+    $('#editBtns').classList.remove('hidden');
+    var ab = $('#adminBanner');
+    ab.textContent = auth.pin ? 'Verwaltung: Du bearbeitest den Eintrag von ' + x.name + ' (Code ' + AM.fmtCode(x.code) + ').' : '';
+    ab.classList.toggle('hidden', !auth.pin);
+    formErr(''); renderAll();
+    $('#formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function stopEdit() {
+    editing = null; $('#form').reset();
+    $('#formTitle').textContent = 'Plätzchen eintragen';
+    $('#submitBtn').textContent = 'Eintragen';
+    $('#editBtns').classList.add('hidden'); $('#adminBanner').classList.add('hidden');
+    formErr('');
+    if (params.has('code') || params.has('admin')) history.replaceState(null, '', location.pathname);
+    renderAll();
+  }
+  $('#cancelBtn').addEventListener('click', stopEdit);
+  $('#deleteBtn').addEventListener('click', function () {
+    if (!editing || !confirm('„' + editing.entry.sorte + '“ von ' + editing.entry.name + ' wirklich löschen?')) return;
+    var btn = this; AM.busy(btn, true, 'Lösche …');
+    AM.api('keks_delete', Object.assign({ id: editing.entry.id }, editing.auth)).then(function (r) {
+      AM.busy(btn, false);
+      if (!r.ok) { formErr(r.error); return; }
+      AM.forgetMine(editing.entry.id, KIND); S = r.state; stopEdit(); flash('Der Eintrag wurde gelöscht.');
+    }).catch(function (e) { AM.busy(btn, false); formErr(e.message); });
+  });
+
+  function openByCode(code) {
+    var btn = $('#codeBtn'); AM.busy(btn, true, '…'); codeErr('');
+    AM.api('keks_get', { code: code }).then(function (r) {
+      AM.busy(btn, false);
+      if (!r.ok) { codeErr(r.error); return; }
+      S = r.state; AM.rememberMine(r.entry, KIND); startEdit(r.entry, { code: r.entry.code });
+    }).catch(function (e) { AM.busy(btn, false); codeErr(e.message); });
+  }
+  function openAdmin(id) {
+    AM.api('keks_get', { pin: AM.getAdminPin(), id: id }).then(function (r) {
+      if (!r.ok) { showMsg(r.error); return; }
+      S = r.state; startEdit(r.entry, { pin: AM.getAdminPin() });
+    }).catch(function (e) { showMsg(e.message); });
+  }
+  $('#codeForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var c = $('#codeInput').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (c.length !== 6) return codeErr('Der Code hat 6 Zeichen.');
+    openByCode(c);
+  });
+
+  // ---------- Absenden ----------
+  $('#form').addEventListener('submit', function (ev) {
+    ev.preventDefault(); formErr('');
+    var data = {
+      name: $('#name').value.replace(/\s+/g, ' ').trim(),
+      sorte: $('#sorte').value.replace(/\s+/g, ' ').trim(),
+      stueck: Math.round(Number($('#stueck').value)),
+      einpacken: $('#einpacken').checked
+    };
+    if (data.name.length < 2) { $('#name').focus(); return formErr('Bitte deinen Namen eintragen.'); }
+    if (data.sorte.length < 3) { $('#sorte').focus(); return formErr('Bitte die Plätzchensorte eintragen.'); }
+    renderHint();
+    if (blocked) { $('#sorte').focus(); return formErr('Von dieser Sorte gibt es schon genug. Bitte eine andere Sorte wählen.'); }
+    if (!(data.stueck >= 1 && data.stueck <= 1000)) { $('#stueck').focus(); return formErr('Bitte ungefähr angeben, wie viele Plätzchen du backst.'); }
+    var btn = $('#submitBtn'), wasEdit = !!editing, wasAdmin = editing && editing.auth.pin;
+    AM.busy(btn, true, wasEdit ? 'Speichere …' : 'Trage ein …');
+    var call = wasEdit ? AM.api('keks_update', Object.assign({ id: editing.entry.id, data: data }, editing.auth)) : AM.api('keks_create', { data: data });
+    call.then(function (r) {
+      AM.busy(btn, false);
+      if (r.state) S = r.state;
+      if (!r.ok) { renderAll(); formErr(r.error); return; }
+      if (!wasAdmin) AM.rememberMine(r.entry, KIND);
+      stopEdit();
+      showDone(r.entry, wasEdit, wasAdmin);
+    }).catch(function (e) { AM.busy(btn, false); formErr(e.message); });
+  });
+
+  function showDone(x, wasEdit, wasAdmin) {
+    var p = P(), tueten = Math.round(x.stueck / p.stueckProTuete * 10) / 10;
+    var link = location.origin + location.pathname + '?code=' + x.code;
+    var same = x.gruppe && x.gruppe.toLowerCase() !== x.sorte.toLowerCase() ? ' <span class="muted">(zählt als „' + esc(x.gruppe) + '“)</span>' : '';
+    var d = $('#done');
+    d.innerHTML =
+      '<h2>' + (wasEdit ? 'Änderung gespeichert' : 'Danke, ' + esc(x.name.split(' ')[0]) + '! 🍪') + '</h2>' +
+      '<ul class="assign">' +
+      '<li><b>' + esc(x.sorte) + same + '</b>ca. ' + x.stueck + ' Stück, das sind etwa ' + tueten.toLocaleString('de-DE') + ' Tüten</li>' +
+      '<li><b>Abgabe</b>' + esc(p.abgabe) + '</li>' +
+      (x.einpacken ? '<li><b>Einpacken</b>' + esc(p.einpacken) + '</li>' : '') +
+      '</ul>' +
+      (wasAdmin ? '' :
+        '<div class="codebox"><div class="lbl">Dein persönlicher Code</div><div class="code">' + esc(AM.fmtCode(x.code)) + '</div></div>' +
+        '<div class="small muted">Dieses Gerät merkt sich deinen Eintrag. Von einem anderen Gerät aus kannst du ihn mit dem Code ändern oder löschen.</div>') +
+      '<div class="actions">' +
+      (wasAdmin ? '' : '<button class="btn" id="copyLink">Link zum Ändern kopieren</button>') +
+      '<a class="btn primary" href="plan.html#plaetzchen">Zur Übersicht</a>' +
+      '<button class="linkbtn" id="another">Noch eine Sorte eintragen</button></div>';
+    d.classList.remove('hidden'); $('#formCard').classList.add('hidden'); $('#codeCard').classList.add('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    var cl = $('#copyLink');
+    if (cl) cl.addEventListener('click', function () {
+      var ok = function () { cl.textContent = '✓ Link kopiert'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(link).then(ok, function () { prompt('Link zum Kopieren:', link); });
+      else prompt('Link zum Kopieren:', link);
+    });
+    $('#another').addEventListener('click', function () {
+      d.classList.add('hidden'); $('#formCard').classList.remove('hidden'); $('#codeCard').classList.remove('hidden');
+      if (!wasAdmin) $('#name').value = x.name;
+      $('#formCard').scrollIntoView({ behavior: 'smooth' }); $('#sorte').focus();
+    });
+  }
+
+  load();
+})();
+</script>
+</body>
+</html>

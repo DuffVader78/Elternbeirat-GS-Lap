@@ -147,3 +147,49 @@ ol.list li{padding:4px 0}
   .garland,nav.tabs,.noprint,.foot,.back{display:none !important}
   .card{box-shadow:none;border:none;padding:0}
 }
+
+/* Plätzchen: Kickstarter-Balken */
+.goal{margin-top:4px}
+.goal-head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.goal-num{font-size:40px;font-weight:850;line-height:1;color:var(--red)}
+.goal.compact .goal-num{font-size:30px}
+.goal-unit{font-weight:700;font-size:17px}
+.goal-sub{color:var(--mut);font-size:13.5px}
+.goal-track{position:relative;height:18px;border-radius:9px;background:var(--bg2);border:1px solid var(--line);margin-top:12px;overflow:hidden}
+.goal-track i{position:absolute;top:0;bottom:0;left:0}
+.goal-track .f1{background:var(--green)}
+.goal-track .f2{background:var(--gold)}
+.goal-track .f3{background:repeating-linear-gradient(45deg,var(--red) 0 8px,#d9483f 8px 16px)}
+.goal-track .mark{position:absolute;top:-2px;bottom:-2px;width:2px;margin-left:-1px;background:var(--ink);opacity:.55}
+.goal-labels{position:relative;height:20px;font-size:12px;color:var(--mut);margin-top:3px}
+.goal-labels span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.goal-labels span.bonus{right:0;transform:none;font-style:italic}
+.goal-msg{margin-top:6px;font-size:15px}
+
+/* Plätzchen: Formular */
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1.5px solid var(--line);background:var(--card2);color:var(--ink);border-radius:999px;padding:6px 11px;font:inherit;font-size:14px;cursor:pointer}
+.chip.wish{border-color:var(--gold);background:var(--gold-soft)}
+.chip.full{opacity:.55;text-decoration:line-through;cursor:default}
+.chip .n{color:var(--mut);font-size:12.5px;margin-left:4px}
+.hint{margin-top:8px;font-size:14px;border-radius:10px;padding:9px 12px;background:var(--card2);border:1px solid var(--line)}
+.hint.good{background:var(--green-soft);border-color:transparent}
+.hint.warn{background:var(--gold-soft);border-color:transparent}
+.hint.bad{background:var(--red-soft);border-color:transparent}
+input[type=number]{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card2);color:var(--ink)}
+.calc{color:var(--mut);font-size:14px;margin-top:6px}
+.infobox{display:grid;gap:4px;font-size:14.5px}
+.infobox b{font-weight:650}
+
+/* Übersicht: Unterreiter */
+.subtabs{display:flex;gap:8px;margin-top:16px}
+.subtabs button{flex:1;font:inherit;font-weight:650;font-size:15px;padding:10px;border-radius:10px;border:1.5px solid var(--line);background:var(--card2);color:var(--mut);cursor:pointer}
+.subtabs button[aria-selected="true"]{border-color:var(--red);color:var(--ink);background:var(--card)}
+.wishlist{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr;gap:4px}
+@media (min-width:560px){.wishlist{grid-template-columns:1fr 1fr}}
+.wishlist li{padding:6px 0;border-bottom:1px solid var(--line)}
+.wishlist .ok{color:var(--green);font-weight:700}
+.wishlist .open{color:var(--gold);font-weight:700}
+table.plan td.num,table.plan th.num{text-align:right;white-space:nowrap}
+table.plan.keks{table-layout:fixed}
+table.plan.keks td{overflow-wrap:anywhere;hyphens:auto}
