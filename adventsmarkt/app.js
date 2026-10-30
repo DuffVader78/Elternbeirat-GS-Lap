@@ -195,7 +195,7 @@
   }
 
   window.AM = {
-    sortKey: sortKey, keksGroups: keksGroups, matchGroup: matchGroup, keksStats: keksStats, goalBar: goalBar,
+    sortKey: sortKey, keyDistance: keyDistance, keksGroups: keksGroups, matchGroup: matchGroup, keksStats: keksStats, goalBar: goalBar,
     api: api, apiUrl: apiUrl, loadMine: loadMine, rememberMine: rememberMine, forgetMine: forgetMine,
     getAdminPin: getAdminPin, setAdminPin: setAdminPin, occupancy: occupancy, freeCounts: freeCounts,
     springerBuden: springerBuden, slotText: slotText, esc: esc, fmtCode: fmtCode, $: $, $$: $$, busy: busy

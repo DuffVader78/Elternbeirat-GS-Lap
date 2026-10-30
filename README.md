@@ -105,7 +105,8 @@ Link für die Eltern: `…/adventsmarkt/plaetzchen.html`
 - **Tüten-Ziel:** Aus der Gesamtstückzahl berechnet die App die Tüten (Stückzahl ÷ Plätzchen pro Tüte) und zeigt sie als Fortschrittsbalken: Ziel 150, Zusatzziel 200, alles darüber ist Bonus.
 - **Übersicht:** Unter „Übersicht → Plätzchen“ stehen der Balken, die Wunschsorten, alle Sorten mit Bäcker:innen und die Helfer:innen fürs Einpacken. Das PDF enthält Helferplan und Plätzchen-Seite.
 - **Ändern und Löschen** funktioniert wie bei der Helferliste mit persönlichem Code, die Verwaltung mit derselben Admin-PIN.
-- **Falsch zusammengefasst?** In der Tabelle im Blatt „Plaetzchen“ die Spalte **Gruppe** korrigieren. Die App zählt nach dieser Spalte.
+- **Rückfrage beim Zusammenfassen:** Ordnet die App eine Sorte über einen anderen Namen oder eine Teilübereinstimmung zu (z. B. „Kipferl“ → Vanillekipferl), fragt sie vor dem Speichern nach: „Ist das dieselbe Sorte?“. Bei „Nein“ gibt man der Sorte einen genaueren Namen. Reine Tippfehler wie „Vanillekipfel“ werden ohne Rückfrage zugeordnet.
+- **Trotzdem falsch zusammengefasst?** In der Tabelle im Blatt „Plaetzchen“ die Spalte **Gruppe** korrigieren. Die App zählt nach dieser Spalte.
 
 ### Plätzchen anpassen
 
@@ -113,7 +114,7 @@ Alles steht in `Code.gs` im Block `CONFIG` unter `plaetzchen`:
 
 | Einstellung | Bedeutung |
 |---|---|
-| `stueckProTuete` | geschätzte Plätzchen pro Tüte, aktuell 10. Nach einer Probetüte anpassen. |
+| `stueckProTuete` | geschätzte Plätzchen pro Tüte, aktuell 15 (Probetüte) |
 | `zielTueten`, `zusatzZielTueten` | 150 und 200 |
 | `maxProSorte` | 3 |
 | `wunschsorten` | die 10 gesuchten Sorten |

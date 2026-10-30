@@ -31,11 +31,11 @@ var CONFIG = {
   plaetzchen: {
     offen: true,               // auf false setzen, um neue Plätzchen-Einträge zu sperren
     maxProSorte: 3,            // so viele Familien dürfen dieselbe Sorte backen
-    stueckProTuete: 10,        // geschätzte Plätzchen pro Tüte (nach einer Probetüte anpassen)
+    stueckProTuete: 15,        // geschätzte Plätzchen pro Tüte (Probetüte: ca. 15)
     zielTueten: 150,           // Ziel
     zusatzZielTueten: 200,     // Zusatzziel, alles darüber ist Bonus
-    abgabe: 'Donnerstag, 03.12., oder Freitag, 04.12., jeweils bis 14:00 Uhr',
-    einpacken: 'Freitag, 04.12., ab 14:30 Uhr im Hort',
+    abgabe: 'Donnerstag, 03.12., oder Freitag, 04.12., jeweils bis 14:00 Uhr im Hort Lappersdorf',
+    einpacken: 'Freitag, 04.12., ab 14:30 Uhr im Hort Lappersdorf',
     // Diese Sorten wünschen wir uns. Sobald jemand eine davon einträgt, verschwindet sie aus "Gesucht".
     wunschsorten: ['Vanillekipferl', 'Zimtsterne', 'Butterplätzchen', 'Spitzbuben', 'Kokosmakronen',
       'Spritzgebäck', 'Engelsaugen', 'Nussecken', 'Lebkuchen', 'Schwarz-Weiß-Gebäck'],

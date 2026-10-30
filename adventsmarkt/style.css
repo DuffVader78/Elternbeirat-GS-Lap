@@ -176,6 +176,10 @@ ol.list li{padding:4px 0}
 .hint.good{background:var(--green-soft);border-color:transparent}
 .hint.warn{background:var(--gold-soft);border-color:transparent}
 .hint.bad{background:var(--red-soft);border-color:transparent}
+.confirm{margin-top:18px;border:2px solid var(--gold);background:var(--gold-soft);border-radius:14px;padding:14px}
+.confirm p{margin:0 0 12px}
+.confirm .row{gap:8px}
+.confirm .btn{flex:1 1 200px}
 input[type=number]{width:100%;font:inherit;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid var(--line);background:var(--card2);color:var(--ink)}
 .calc{color:var(--mut);font-size:14px;margin-top:6px}
 .infobox{display:grid;gap:4px;font-size:14.5px}

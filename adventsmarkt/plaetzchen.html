@@ -70,6 +70,13 @@
       <label class="field">Hilfst du beim Einpacken?</label>
       <label class="choice check"><input type="checkbox" id="einpacken"><span><span class="t">Ja, ich helfe beim Einpacken</span><span class="d" id="einpackenD"></span></span></label>
 
+      <div id="confirmBox" class="confirm hidden" role="alertdialog" aria-live="assertive">
+        <p id="confirmText"></p>
+        <div class="row">
+          <button type="button" class="btn primary" id="confirmYes">Ja, dieselbe Sorte</button>
+          <button type="button" class="btn" id="confirmNo">Nein, Namen ändern</button>
+        </div>
+      </div>
       <div id="formErr" class="notice err hidden" role="alert"></div>
       <div class="actions">
         <button type="submit" class="btn primary block" id="submitBtn">Eintragen</button>
@@ -102,7 +109,7 @@
 (function () {
   'use strict';
   var $ = AM.$, esc = AM.esc;
-  var S = null, editing = null, blocked = false;
+  var S = null, editing = null, blocked = false, pending = null, confirmedKey = '';
   var params = new URLSearchParams(location.search);
   var KIND = 'keks';
 
@@ -166,23 +173,57 @@
   $('#wishChips').addEventListener('click', chipClick);
   $('#takenChips').addEventListener('click', chipClick);
 
+  // Rückfrage nötig, wenn die Sorte nur über Ähnlichkeit/anderen Namen zugeordnet wird (kein reiner Tippfehler)
+  function needsConfirm(v, g) {
+    if (!g) return false;
+    if (editing && AM.sortKey(v) === AM.sortKey(editing.entry.sorte)) return false;
+    var d = AM.keyDistance(AM.sortKey(v), AM.sortKey(g.name));
+    return d < 0 || d >= 2;
+  }
+
   function renderHint() {
     var h = $('#sorteHint'), v = $('#sorte').value.trim(), max = P().maxProSorte;
-    blocked = false;
+    blocked = false; pending = null;
+    if (AM.sortKey(v) !== confirmedKey) hideConfirm();
     if (v.length < 3) { h.classList.add('hidden'); return; }
-    var g = AM.matchGroup(v, groups()), cls, html;
+    var g = AM.matchGroup(v, groups()), cls, html, other = needsConfirm(v, g);
+    var rename = ' Ist deine Sorte etwas anderes? Dann gib ihr einen genaueren Namen, z. B. mit Zutat oder Form.';
     if (g && g.count >= max) {
       blocked = true; cls = 'bad';
-      html = 'Von <b>„' + esc(g.name) + '“</b> gibt es schon genug (' + g.count + ' von ' + max + '). Magst du eine andere Sorte backen?';
+      html = (other ? '„' + esc(v) + '“ wird als <b>„' + esc(g.name) + '“</b> gezählt, und davon' : 'Von <b>„' + esc(g.name) + '“</b>') +
+        ' gibt es schon genug (' + g.count + ' von ' + max + ').' + rename + ' Oder back gern eine andere Sorte.';
     } else if (g && g.wunsch && g.count === 0) {
-      cls = 'good'; html = '⭐ Super, <b>„' + esc(g.name) + '“</b> steht auf unserer Wunschliste!';
+      cls = 'good'; html = '⭐ Super, <b>„' + esc(g.name) + '“</b> steht auf unserer Wunschliste!' + (other ? '<br><span class="small">„' + esc(v) + '“ wird als „' + esc(g.name) + '“ gezählt.</span>' : '');
+      if (other) pending = g;
     } else if (g) {
       cls = 'warn';
-      html = 'Wird zusammen mit <b>„' + esc(g.name) + '“</b> gezählt: ' + (g.count === 1 ? 'eine Familie backt' : g.count + ' Familien backen') + ' diese Sorte schon, ' + (max - g.count) + (max - g.count === 1 ? ' Platz ist' : ' Plätze sind') + ' noch frei.';
+      html = (other ? '„' + esc(v) + '“ wird zusammen mit <b>„' + esc(g.name) + '“</b> gezählt: ' : 'Zählt als <b>„' + esc(g.name) + '“</b>: ') +
+        (g.count === 1 ? 'eine Familie backt' : g.count + ' Familien backen') + ' diese Sorte schon, ' + (max - g.count) + (max - g.count === 1 ? ' Platz ist' : ' Plätze sind') + ' noch frei.' + (other ? rename : '');
+      if (other) pending = g;
     } else { cls = ''; html = 'Neue Sorte, schön! Danke für die Abwechslung.'; }
     h.className = 'hint ' + cls; h.innerHTML = html;
   }
   $('#sorte').addEventListener('input', renderHint);
+
+  function hideConfirm() { $('#confirmBox').classList.add('hidden'); }
+  function askConfirm(v, g) {
+    $('#confirmText').innerHTML = 'Deine Sorte <b>„' + esc(v) + '“</b> wird zusammen mit <b>„' + esc(g.name) + '“</b> gezählt' +
+      (g.count ? ' (schon ' + g.count + ' von ' + P().maxProSorte + ')' : '') + '. Ist das dieselbe Sorte?';
+    $('#confirmBox').classList.remove('hidden');
+    $('#confirmBox').scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  $('#confirmYes').addEventListener('click', function () {
+    confirmedKey = AM.sortKey($('#sorte').value);
+    hideConfirm();
+    $('#form').requestSubmit ? $('#form').requestSubmit() : $('#submitBtn').click();
+  });
+  $('#confirmNo').addEventListener('click', function () {
+    hideConfirm(); confirmedKey = '';
+    var h = $('#sorteHint');
+    h.className = 'hint warn';
+    h.innerHTML = 'Gib deiner Sorte einen genaueren Namen, damit sie nicht mit „' + esc(pending ? pending.name : '') + '“ verwechselt wird, z. B. „Schoko-…“, „Nuss-…“ oder „…taler“.';
+    var el = $('#sorte'); el.focus(); el.select();
+  });
 
   function renderCalc() {
     var n = Math.round(Number($('#stueck').value));
@@ -251,7 +292,7 @@
     $('#formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function stopEdit() {
-    editing = null; $('#form').reset();
+    editing = null; $('#form').reset(); confirmedKey = ''; hideConfirm();
     $('#formTitle').textContent = 'Plätzchen eintragen';
     $('#submitBtn').textContent = 'Eintragen';
     $('#editBtns').classList.add('hidden'); $('#adminBanner').classList.add('hidden');
@@ -303,8 +344,9 @@
     if (data.name.length < 2) { $('#name').focus(); return formErr('Bitte deinen Namen eintragen.'); }
     if (data.sorte.length < 3) { $('#sorte').focus(); return formErr('Bitte die Plätzchensorte eintragen.'); }
     renderHint();
-    if (blocked) { $('#sorte').focus(); return formErr('Von dieser Sorte gibt es schon genug. Bitte eine andere Sorte wählen.'); }
+    if (blocked) { $('#sorte').focus(); return formErr('Von dieser Sorte gibt es schon genug. Bitte eine andere Sorte wählen oder deiner Sorte einen genaueren Namen geben.'); }
     if (!(data.stueck >= 1 && data.stueck <= 1000)) { $('#stueck').focus(); return formErr('Bitte ungefähr angeben, wie viele Plätzchen du backst.'); }
+    if (pending && AM.sortKey(data.sorte) !== confirmedKey) { askConfirm(data.sorte, pending); return; }
     var btn = $('#submitBtn'), wasEdit = !!editing, wasAdmin = editing && editing.auth.pin;
     AM.busy(btn, true, wasEdit ? 'Speichere …' : 'Trage ein …');
     var call = wasEdit ? AM.api('keks_update', Object.assign({ id: editing.entry.id, data: data }, editing.auth)) : AM.api('keks_create', { data: data });
